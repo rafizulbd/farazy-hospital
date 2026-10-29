@@ -1,0 +1,24 @@
+[29-Oct-2026 22:09:53 UTC] PHP Fatal error:  Uncaught ErrorException: Cannot modify header information - headers already sent by (output started at /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php:393) in /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php:328
+Stack trace:
+#0 /home/doctorba/farazy.rafizul.me/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(265): Illuminate\Foundation\Bootstrap\HandleExceptions->handleError(2, 'Cannot modify h...', '/home/doctorba/...', 328)
+#1 [internal function]: Illuminate\Foundation\Bootstrap\HandleExceptions->{closure:Illuminate\Foundation\Bootstrap\HandleExceptions::forwardsTo():264}(2, 'Cannot modify h...', '/home/doctorba/...', 328)
+#2 /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php(328): header('HTTP/1.1 500 In...', true, 500)
+#3 /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php(407): Symfony\Component\HttpFoundation\Response->sendHeaders()
+#4 /home/doctorba/farazy.rafizul.me/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(228): Symfony\Component\HttpFoundation\Response->send()
+#5 /home/doctorba/farazy.rafizul.me/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(205): Illuminate\Foundation\Bootstrap\HandleExceptions->renderHttpResponse(Object(Illuminate\Contracts\Container\BindingResolutionException))
+#6 /home/doctorba/farazy.rafizul.me/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(265): Illuminate\Foundation\Bootstrap\HandleExceptions->handleException(Object(Illuminate\Contracts\Container\BindingResolutionException))
+#7 [internal function]: Illuminate\Foundation\Bootstrap\HandleExceptions->{closure:Illuminate\Foundation\Bootstrap\HandleExceptions::forwardsTo():264}(Object(Illuminate\Contracts\Container\BindingResolutionException))
+#8 {main}
+  thrown in /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php on line 328
+[29-Oct-2026 22:11:46 UTC] PHP Fatal error:  Uncaught ErrorException: Cannot modify header information - headers already sent by (output started at /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php:393) in /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php:328
+Stack trace:
+#0 /home/doctorba/farazy.rafizul.me/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(265): Illuminate\Foundation\Bootstrap\HandleExceptions->handleError(2, 'Cannot modify h...', '/home/doctorba/...', 328)
+#1 [internal function]: Illuminate\Foundation\Bootstrap\HandleExceptions->{closure:Illuminate\Foundation\Bootstrap\HandleExceptions::forwardsTo():264}(2, 'Cannot modify h...', '/home/doctorba/...', 328)
+#2 /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php(328): header('HTTP/1.1 500 In...', true, 500)
+#3 /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php(407): Symfony\Component\HttpFoundation\Response->sendHeaders()
+#4 /home/doctorba/farazy.rafizul.me/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(228): Symfony\Component\HttpFoundation\Response->send()
+#5 /home/doctorba/farazy.rafizul.me/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(205): Illuminate\Foundation\Bootstrap\HandleExceptions->renderHttpResponse(Object(Illuminate\Contracts\Container\BindingResolutionException))
+#6 /home/doctorba/farazy.rafizul.me/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(265): Illuminate\Foundation\Bootstrap\HandleExceptions->handleException(Object(Illuminate\Contracts\Container\BindingResolutionException))
+#7 [internal function]: Illuminate\Foundation\Bootstrap\HandleExceptions->{closure:Illuminate\Foundation\Bootstrap\HandleExceptions::forwardsTo():264}(Object(Illuminate\Contracts\Container\BindingResolutionException))
+#8 {main}
+  thrown in /home/doctorba/farazy.rafizul.me/vendor/symfony/http-foundation/Response.php on line 328
