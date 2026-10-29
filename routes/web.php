@@ -33,9 +33,24 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth', 'force_password'])->group(function () {
-    Route::get('/dashboard', function () { return view('dashboard'); })->name('dashboard');
+    Route::get('/dashboard', function (Request $request) {
+        $setting = \App\Models\RosterSetting::first();
+        $doctors = \App\Models\Doctor::with('weeklyRoster')->get();
+        $user = Auth::user();
+        $selectedDocId = $request->query('doctor_id', $user->doctor_id ?: ($doctors->first()->id ?? null));
+        $activeDoctor = $selectedDocId ? \App\Models\Doctor::with('weeklyRoster')->find($selectedDocId) : null;
+        return view('dashboard', compact('setting', 'doctors', 'activeDoctor'));
+    })->name('dashboard');
+
     Route::resource('doctors', DoctorController::class);
-    Route::resource('rosters', RosterController::class);
+
+    Route::get('/rosters', [RosterController::class, 'index'])->name('rosters.index');
+    Route::get('/rosters/create', [RosterController::class, 'index'])->name('rosters.create');
+    Route::post('/rosters/settings', [RosterController::class, 'updateSettings'])->name('rosters.settings');
+    Route::post('/rosters/draft', [RosterController::class, 'saveDraft'])->name('rosters.draft.save');
+    Route::post('/rosters/unlock/{doctorId}', [RosterController::class, 'unlockDraft'])->name('rosters.draft.unlock');
+    Route::post('/rosters/swap-request', [RosterController::class, 'requestSwap'])->name('rosters.swap.request');
+    Route::post('/rosters/swap-respond/{id}', [RosterController::class, 'respondSwap'])->name('rosters.swap.respond');
 });
 
 require __DIR__.'/auth.php';
