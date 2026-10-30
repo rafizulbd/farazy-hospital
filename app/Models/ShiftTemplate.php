@@ -1,1 +1,4 @@
-<?php namespace App\Models; use Illuminate\Database\Eloquent\Model; class ShiftTemplate extends Model { protected $guarded = []; }
+<?php
+namespace App\Models;
+use Illuminate\Database\Eloquent\Model;
+class ShiftTemplate extends Model { protected $guarded = []; }

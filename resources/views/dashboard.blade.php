@@ -3,239 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Farazy Hospital</title>
+    <title>Dashboard | {{ $setting->hospital_name }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
-<body class="bg-slate-100 min-h-screen flex font-sans">
-    <!-- Sidebar -->
-    <div class="w-64 bg-slate-900 text-white flex flex-col shadow-2xl min-h-screen">
-        <div class="p-6 text-xl font-extrabold border-b border-slate-800 flex items-center gap-2 text-emerald-400">
-            <i class="fa-solid fa-hospital"></i> Farazy Hospital
-        </div>
-        <nav class="flex-1 p-4 space-y-2 mt-2">
-            <a href="{{ route('dashboard') }}" class="flex items-center gap-3 p-3 bg-blue-600 text-white rounded-xl font-semibold shadow">
-                <i class="fa-solid fa-calendar-check"></i> Dashboard & Calendar
-            </a>
-            <a href="{{ route('rosters.index') }}" class="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition">
-                <i class="fa-solid fa-clock-rotate-left"></i> Roster & Swap Portal
-            </a>
-            <a href="{{ route('doctors.index') }}" class="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition">
-                <i class="fa-solid fa-user-doctor"></i> Doctor Directory
-            </a>
-        </nav>
-        <div class="p-4 border-t border-slate-800">
-            <div class="mb-3 px-2 text-xs text-slate-400">
-                Logged in as: <strong class="text-white block text-sm">{{ Auth::user()->name }} ({{ strtoupper(Auth::user()->role) }})</strong>
-            </div>
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="w-full bg-rose-600 py-2 rounded-xl hover:bg-rose-700 transition font-bold text-sm shadow">
-                    <i class="fa-solid fa-right-from-bracket mr-1"></i> Logout
-                </button>
-            </form>
-        </div>
-    </div>
+<body class="bg-slate-100 min-h-screen flex flex-col text-slate-800">
+    @include('partials.nav')
 
-    <!-- Main Content -->
-    <div class="flex-1 flex flex-col overflow-y-auto">
-        <!-- TOP OFFICIAL NOTICE & TIMELINE BANNER -->
-        @if($setting)
-        <div class="bg-gradient-to-r from-blue-950 via-indigo-900 to-slate-900 text-white p-6 shadow-lg border-b-4 border-amber-400">
-            <div class="max-w-7xl mx-auto">
-                <div class="flex flex-wrap justify-between items-center gap-4 mb-3">
-                    <div class="flex items-center gap-3">
-                        <span class="bg-amber-400 text-slate-950 font-extrabold px-3 py-1 rounded-full text-xs uppercase tracking-wider animate-pulse">
-                            <i class="fa-solid fa-bullhorn mr-1"></i> Official Notice
-                        </span>
-                        <h1 class="text-xl font-extrabold tracking-wide">{{ $setting->title }}</h1>
-                        <span class="bg-emerald-500/20 border border-emerald-400 text-emerald-300 text-xs font-bold px-3 py-1 rounded-full">
-                            <i class="fa-solid fa-shield-halved mr-1"></i> {{ $setting->validity_label }}
-                        </span>
-                    </div>
-                    <div>
-                        @if($setting->current_phase === 'draft_open')
-                            <span class="bg-blue-500 text-white px-4 py-1.5 rounded-full text-xs font-extrabold uppercase shadow"><i class="fa-solid fa-pen-to-square mr-1"></i> Phase 1: Draft Submission Open</span>
-                        @elseif($setting->current_phase === 'swap_open')
-                            <span class="bg-amber-500 text-slate-950 px-4 py-1.5 rounded-full text-xs font-extrabold uppercase shadow"><i class="fa-solid fa-people-arrows mr-1"></i> Phase 2: Merge & Mutual Swap Open</span>
-                        @else
-                            <span class="bg-emerald-500 text-white px-4 py-1.5 rounded-full text-xs font-extrabold uppercase shadow"><i class="fa-solid fa-lock mr-1"></i> Phase 3: Final Approved & Locked ({{ $setting->approved_by }})</span>
+    <main class="max-w-7xl mx-auto w-full px-4 py-6 space-y-6 flex-1">
+        @if(session('success'))
+            <div class="p-3.5 bg-emerald-50 border border-emerald-300 text-emerald-900 font-semibold rounded-xl text-xs flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-emerald-600"></i> {{ session('success') }}
+            </div>
+        @endif
+
+        @if($pendingSwapsCount > 0)
+            <div class="p-3.5 bg-purple-50 border border-purple-300 text-purple-950 rounded-xl flex justify-between items-center text-xs font-bold">
+                <span><i class="fa-solid fa-bell text-purple-600 mr-2"></i> You have <strong>{{ $pendingSwapsCount }} Shift Swap Request(s)</strong> awaiting your response.</span>
+                <a href="{{ route('rosters.index') }}#swap-section" class="bg-purple-700 text-white px-3 py-1 rounded">Review</a>
+            </div>
+        @endif
+
+        @if(Auth::user()->role === 'admin' && ($adminPendingSwaps > 0 || $adminPendingUpdates > 0))
+            <div class="p-3.5 bg-amber-50 border border-amber-300 text-amber-950 rounded-xl flex flex-wrap justify-between items-center gap-2 text-xs font-bold">
+                <span><i class="fa-solid fa-user-shield text-amber-600 mr-1.5"></i> In-Charge Action Required: {{ $adminPendingSwaps }} Swap(s) & {{ $adminPendingUpdates }} Time Correction(s) waiting.</span>
+                <a href="{{ route('admin.panel') }}" class="bg-amber-600 text-white px-3 py-1 rounded">Open Approvals</a>
+            </div>
+        @endif
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-[#064e3b] text-white flex items-center justify-center font-bold">
+                    {{ substr($activeUser->name, 0, 1) }}
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-bold text-slate-900">{{ $activeUser->name }}</h2>
+                        <span class="bg-slate-100 border text-slate-700 text-[11px] font-semibold px-2 py-0.5 rounded">{{ $activeUser->employee_id }}</span>
+                        @if($setting->is_verified)
+                            <span class="bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded">Verified Schedule</span>
                         @endif
                     </div>
+                    <p class="text-xs text-slate-500">{{ $activeUser->designation }} &bull; {{ $setting->validity_text }}</p>
                 </div>
+            </div>
 
-                <p class="text-amber-200 text-sm font-medium bg-white/10 p-3 rounded-xl border border-white/15 mb-4">
-                    {{ $setting->notice_text }}
-                </p>
+            <form method="GET" action="{{ route('dashboard') }}" class="flex flex-wrap items-center gap-2 text-xs">
+                <select name="user_id" onchange="this.form.submit()" class="border rounded-lg px-2.5 py-1.5 font-semibold bg-slate-50">
+                    @foreach($team as $member)
+                        <option value="{{ $member->id }}" {{ $activeUser->id == $member->id ? 'selected' : '' }}>{{ $member->name }} ({{ $member->employee_id }})</option>
+                    @endforeach
+                </select>
+                <select name="month" onchange="this.form.submit()" class="border rounded-lg px-2.5 py-1.5 font-semibold bg-slate-50">
+                    @for($m = 1; $m <= 12; $m++) <option value="{{ $m }}" {{ $month == $m ? 'selected' : '' }}>{{ date('F', mktime(0,0,0,$m,1)) }}</option> @endfor
+                </select>
+                <select name="year" onchange="this.form.submit()" class="border rounded-lg px-2.5 py-1.5 font-semibold bg-slate-50">
+                    @for($y = 2025; $y <= 2028; $y++) <option value="{{ $y }}" {{ $year == $y ? 'selected' : '' }}>{{ $y }}</option> @endfor
+                </select>
+                <a href="{{ route('report.print', ['user_id' => $activeUser->id, 'month' => $month, 'year' => $year]) }}" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg font-semibold">Print A4</a>
+            </form>
+        </div>
 
-                <!-- 3-Step Visual Timeline -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                    <div class="p-3 rounded-xl border {{ $setting->current_phase === 'draft_open' ? 'bg-blue-600/40 border-blue-400 ring-2 ring-blue-400' : 'bg-white/5 border-white/10 opacity-75' }}">
-                        <div class="font-extrabold text-blue-300 uppercase">{{ $setting->phase1_date }}</div>
-                        <div class="text-white font-semibold mt-0.5">Step 1: 7-Day Draft Roster Entry (Auto Self-Lock)</div>
-                    </div>
-                    <div class="p-3 rounded-xl border {{ $setting->current_phase === 'swap_open' ? 'bg-amber-500/30 border-amber-400 ring-2 ring-amber-400' : 'bg-white/5 border-white/10 opacity-75' }}">
-                        <div class="font-extrabold text-amber-300 uppercase">{{ $setting->phase2_date }}</div>
-                        <div class="text-white font-semibold mt-0.5">Step 2: Admin Merge & Mutual Conflict Swap Requisition</div>
-                    </div>
-                    <div class="p-3 rounded-xl border {{ $setting->current_phase === 'locked_final' ? 'bg-emerald-600/40 border-emerald-400 ring-2 ring-emerald-400' : 'bg-white/5 border-white/10 opacity-75' }}">
-                        <div class="font-extrabold text-emerald-300 uppercase">{{ $setting->phase3_date }}</div>
-                        <div class="text-white font-semibold mt-0.5">Step 3: Higher Authority Approval & Final Lock</div>
-                    </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
+            <div class="bg-white p-3 rounded-xl border shadow-sm"><span class="text-[11px] text-slate-500 block">Regular Duty</span><span class="text-lg font-bold">{{ $kpi['regular_days'] }}</span></div>
+            <div class="bg-white p-3 rounded-xl border shadow-sm"><span class="text-[11px] text-emerald-700 block">Present</span><span class="text-lg font-bold text-emerald-700">{{ $kpi['present_days'] }}</span></div>
+            <div class="bg-white p-3 rounded-xl border shadow-sm"><span class="text-[11px] text-rose-700 block">Off Days</span><span class="text-lg font-bold text-rose-700">{{ $kpi['off_days'] }}</span></div>
+            <div class="bg-white p-3 rounded-xl border shadow-sm"><span class="text-[11px] text-amber-700 block">Late Count</span><span class="text-lg font-bold text-amber-700">{{ $kpi['late_days'] }}</span></div>
+            <div class="bg-white p-3 rounded-xl border shadow-sm"><span class="text-[11px] text-indigo-700 block">Overtime</span><span class="text-lg font-bold text-indigo-700">{{ $kpi['ot_hours'] }}h</span></div>
+            <div class="bg-white p-3 rounded-xl border shadow-sm"><span class="text-[11px] text-purple-700 block">Swapped</span><span class="text-lg font-bold text-purple-700">{{ $kpi['swapped_days'] }}</span></div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            @php
+                $cards = [
+                    ['2 Days Ago', \Carbon\Carbon::today()->subDays(2), $twoDaysAgoDuty, 'bg-white border-slate-200'],
+                    ['Yesterday', \Carbon\Carbon::today()->subDay(), $yesterdayDuty, 'bg-white border-slate-200'],
+                    ['Today (Active)', \Carbon\Carbon::today(), $todayDuty, 'bg-emerald-50/50 border-[#065f46] ring-2 ring-emerald-500/20'],
+                    ['Tomorrow', \Carbon\Carbon::today()->addDay(), $tomorrowDuty, 'bg-white border-slate-200'],
+                ];
+            @endphp
+            @foreach($cards as $idx => [$label, $date, $duty, $style])
+            <div class="p-4 rounded-xl border shadow-sm {{ $style }} flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded {{ $idx === 2 ? 'bg-[#065f46] text-white' : 'bg-slate-100' }}">{{ $label }}</span>
+                    <span class="text-xs font-bold text-slate-700">{{ $date->format('d M, D') }}</span>
                 </div>
+                <div class="my-2.5">
+                    <div class="text-sm font-extrabold text-slate-900">{{ $duty ? $duty->shift_name : 'No Shift' }}</div>
+                    @if($duty && $duty->has_overtime)
+                        <span class="text-[10px] font-bold bg-indigo-50 text-indigo-800 border px-1.5 py-0.5 rounded mt-1 inline-block">+OT: {{ $duty->overtime_shift }} ({{ $duty->overtime_hours }}h)</span>
+                    @endif
+                </div>
+                <div class="border-t pt-2 flex justify-between items-center text-[11px] text-slate-600">
+                    <span>In: <strong>{{ $duty && $duty->in_time ? $duty->in_time : '--:--' }}</strong></span>
+                    <span>Out: <strong>{{ $duty && $duty->out_time ? $duty->out_time : '--:--' }}</strong></span>
+                    @if($duty && $duty->attendance_status === 'Late') <span class="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold text-[9px]">LATE</span>
+                    @elseif($duty && $duty->attendance_status === 'Present') <span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold text-[9px]">PRESENT</span>
+                    @endif
+                </div>
+            </div>
+            @endforeach
+        </div>
+
+        @if($todayDuty && ($activeUser->id === Auth::id() || Auth::user()->role === 'admin'))
+        <div class="bg-white p-4 rounded-xl border border-l-4 border-l-[#065f46] flex flex-wrap justify-between items-center gap-3">
+            <div>
+                <h3 class="text-sm font-bold text-slate-900"><i class="fa-solid fa-fingerprint text-[#065f46] mr-1"></i> Today's Time Entry ({{ date('d M Y') }} &mdash; {{ $todayDuty->shift_name }})</h3>
+                <p class="text-xs text-slate-500">Punch In/Out saves and locks your entry automatically.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                @if(!$todayDuty->in_locked)
+                <form action="{{ route('attendance.punch', $todayDuty->id) }}" method="POST" class="flex gap-1" onsubmit="return confirm('Confirm In-Time? Once saved, it will be locked.');">
+                    @csrf <input type="hidden" name="punch_type" value="in_time">
+                    <input type="time" name="in_time" value="{{ date('H:i') }}" class="border rounded p-1 text-xs font-semibold" required>
+                    <button class="bg-[#065f46] text-white px-2.5 py-1 rounded text-xs font-semibold">Save In</button>
+                </form>
+                @else
+                <span class="bg-emerald-50 border border-emerald-200 text-emerald-900 px-2.5 py-1 rounded text-xs font-semibold">In: {{ $todayDuty->in_time }}</span>
+                @endif
+
+                @if(!$todayDuty->out_locked)
+                <form action="{{ route('attendance.punch', $todayDuty->id) }}" method="POST" class="flex gap-1" onsubmit="return confirm('Confirm Out-Time? Once saved, it will be locked.');">
+                    @csrf <input type="hidden" name="punch_type" value="out_time">
+                    <input type="time" name="out_time" value="{{ date('H:i') }}" class="border rounded p-1 text-xs font-semibold" required>
+                    <button class="bg-slate-800 text-white px-2.5 py-1 rounded text-xs font-semibold">Save Out</button>
+                </form>
+                @else
+                <span class="bg-slate-100 border text-slate-800 px-2.5 py-1 rounded text-xs font-semibold">Out: {{ $todayDuty->out_time }}</span>
+                @endif
             </div>
         </div>
         @endif
 
-        <main class="p-6 max-w-7xl mx-auto w-full space-y-6">
-            @php
-                $wRoster = $activeDoctor ? $activeDoctor->weeklyRoster : null;
-                $dayMap = ['Sun'=>'sun_shift','Mon'=>'mon_shift','Tue'=>'tue_shift','Wed'=>'wed_shift','Thu'=>'thu_shift','Fri'=>'fri_shift','Sat'=>'sat_shift'];
-                $yesterdayDay = date('D', strtotime('-1 day'));
-                $todayDay = date('D');
-                $tomorrowDay = date('D', strtotime('+1 day'));
-
-                $yesterdayShift = $wRoster ? $wRoster->{$dayMap[$yesterdayDay]} : 'Not Set';
-                $todayShift = $wRoster ? $wRoster->{$dayMap[$todayDay]} : 'Not Set';
-                $tomorrowShift = $wRoster ? $wRoster->{$dayMap[$tomorrowDay]} : 'Not Set';
-
-                function shiftColorClass($shift) {
-                    if (str_contains($shift, 'Morning')) return 'bg-emerald-100 text-emerald-900 border-emerald-400';
-                    if (str_contains($shift, 'Evening')) return 'bg-amber-100 text-amber-900 border-amber-400';
-                    if (str_contains($shift, 'Night')) return 'bg-indigo-100 text-indigo-900 border-indigo-400';
-                    if (str_contains($shift, 'Off')) return 'bg-rose-100 text-rose-800 border-rose-300';
-                    return 'bg-slate-100 text-slate-600 border-slate-300';
-                }
-            @endphp
-
-            <!-- Top Action & Doctor Selector Bar -->
-            <div class="bg-white p-4 rounded-2xl shadow-sm flex flex-wrap justify-between items-center gap-4 border">
-                <div>
-                    <h2 class="text-lg font-extrabold text-slate-800">
-                        <i class="fa-solid fa-calendar-day text-blue-600 mr-1"></i>
-                        Live Duty Schedule: <span class="text-blue-700">{{ $activeDoctor ? $activeDoctor->name : 'No Doctor Selected' }}</span>
-                    </h2>
-                    <p class="text-xs text-slate-500">Each shift is 8 Hours. Weekly 7-day pattern automatically repeats across the entire month.</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <form method="GET" action="{{ route('dashboard') }}" class="flex items-center gap-2">
-                        <label class="text-xs font-bold text-slate-600">View Schedule For:</label>
-                        <select name="doctor_id" onchange="this.form.submit()" class="border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold bg-slate-50">
-                            @foreach($doctors as $doc)
-                                <option value="{{ $doc->id }}" {{ ($activeDoctor && $activeDoctor->id == $doc->id) ? 'selected' : '' }}>
-                                    {{ $doc->name }} ({{ $doc->specialization ?: 'General' }})
-                                </option>
-                            @endforeach
-                        </select>
-                    </form>
-                    <a href="{{ route('rosters.index') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl text-sm shadow">
-                        <i class="fa-solid fa-sliders mr-1"></i> Go to Roster Portal
-                    </a>
+        @php
+            $firstDay = mktime(0, 0, 0, $month, 1, $year);
+            $daysInMonth = date('t', $firstDay);
+            $startDayOfWeek = date('w', $firstDay);
+            function calColor($d) {
+                if (!$d) return 'bg-slate-50 text-slate-400';
+                if ($d->attendance_status === 'Absent') return 'bg-red-50 text-red-950 border-red-300';
+                if ($d->is_swapped) return 'bg-purple-50 text-purple-950 border-purple-300';
+                if ($d->is_off_day || str_contains(strtolower($d->shift_name), 'off')) return 'bg-rose-50 text-rose-900 border-rose-200';
+                if (str_contains(strtolower($d->shift_name), 'morning')) return 'bg-emerald-50 text-emerald-950 border-emerald-300';
+                if (str_contains(strtolower($d->shift_name), 'evening')) return 'bg-amber-50 text-amber-950 border-amber-300';
+                if (str_contains(strtolower($d->shift_name), 'night')) return 'bg-indigo-50 text-indigo-950 border-indigo-300';
+                return 'bg-teal-50 text-teal-950 border-teal-300';
+            }
+        @endphp
+        <div class="bg-white p-5 rounded-xl border">
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
+                <h3 class="text-base font-bold text-slate-900">{{ date('F Y', $firstDay) }} Interactive Duty Calendar</h3>
+                <div class="flex flex-wrap gap-1.5 text-[10px] font-bold">
+                    <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-900 border border-emerald-300">Morning</span>
+                    <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300">Evening</span>
+                    <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-900 border border-indigo-300">Night</span>
+                    <span class="px-2 py-0.5 rounded bg-purple-50 text-purple-900 border border-purple-300">Swapped</span>
+                    <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-900 border border-rose-200">Off Day</span>
                 </div>
             </div>
-
-            <!-- Yesterday, Today & Tomorrow Highlight Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-slate-400">
-                    <span class="text-xs font-bold uppercase text-slate-400">Yesterday ({{ date('d M, l', strtotime('-1 day')) }})</span>
-                    <div class="mt-2 text-lg font-extrabold text-slate-700">{{ $yesterdayShift }}</div>
-                    <p class="text-xs text-slate-500 mt-1">Completed 8-Hour Duty Cycle</p>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl shadow-lg border-2 border-blue-600 ring-4 ring-blue-50 relative">
-                    <span class="absolute top-3 right-3 bg-blue-600 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase animate-bounce">Today's Duty</span>
-                    <span class="text-xs font-extrabold uppercase text-blue-600">{{ date('d M Y, l') }}</span>
-                    <div class="mt-2 text-2xl font-black text-slate-900">{{ $todayShift }}</div>
-                    <p class="text-xs font-semibold text-emerald-700 mt-1"><i class="fa-solid fa-clock mr-1"></i> Active 8-Hour Shift Window</p>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-indigo-500">
-                    <span class="text-xs font-bold uppercase text-indigo-600">Tomorrow ({{ date('d M, l', strtotime('+1 day')) }})</span>
-                    <div class="mt-2 text-lg font-extrabold text-slate-800">{{ $tomorrowShift }}</div>
-                    <p class="text-xs text-slate-500 mt-1">Upcoming 8-Hour Duty Cycle</p>
-                </div>
-            </div>
-
-            <!-- Interactive Color-Coded Full Monthly Calendar -->
-            @php
-                $month = $setting ? $setting->active_month : date('n');
-                $year = $setting ? $setting->active_year : date('Y');
-                $firstDayOfMonth = mktime(0, 0, 0, $month, 1, $year);
-                $daysInMonth = date('t', $firstDayOfMonth);
-                $startDayOfWeek = date('w', $firstDayOfMonth); // 0 (Sun) to 6 (Sat)
-                $monthName = date('F Y', $firstDayOfMonth);
-            @endphp
-
-            <div class="bg-white p-6 rounded-2xl shadow-md border">
-                <div class="flex flex-wrap justify-between items-center mb-6 gap-4 border-b pb-4">
-                    <div>
-                        <h3 class="text-xl font-black text-slate-800">
-                            <i class="fa-solid fa-calendar-days text-blue-600 mr-2"></i>{{ $monthName }} — Monthly Color-Coded Duty Calendar
-                        </h3>
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            Status: <strong>{{ $setting && $setting->current_phase === 'locked_final' ? '✅ Final Verified & Locked by Authority' : '⏳ Draft / Swap Phase in Progress' }}</strong>
-                        </p>
-                    </div>
-                    <!-- Color Legend -->
-                    <div class="flex flex-wrap gap-2 text-xs font-bold">
-                        <span class="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-400">🌅 Morning (8AM-4PM)</span>
-                        <span class="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-400">🌇 Evening (4PM-12AM)</span>
-                        <span class="px-3 py-1 rounded-lg bg-indigo-100 text-indigo-900 border border-indigo-400">🌙 Night (12AM-8AM)</span>
-                        <span class="px-3 py-1 rounded-lg bg-rose-100 text-rose-800 border border-rose-300">🏖️ Off Day</span>
-                    </div>
-                </div>
-
-                <!-- Calendar Grid Header -->
-                <div class="grid grid-cols-7 gap-2 text-center font-extrabold text-xs uppercase text-slate-600 mb-2">
-                    <div class="bg-slate-100 py-2 rounded-lg">Sunday</div>
-                    <div class="bg-slate-100 py-2 rounded-lg">Monday</div>
-                    <div class="bg-slate-100 py-2 rounded-lg">Tuesday</div>
-                    <div class="bg-slate-100 py-2 rounded-lg">Wednesday</div>
-                    <div class="bg-slate-100 py-2 rounded-lg">Thursday</div>
-                    <div class="bg-slate-100 py-2 rounded-lg">Friday</div>
-                    <div class="bg-slate-100 py-2 rounded-lg">Saturday</div>
-                </div>
-
-                <!-- Calendar Days Grid -->
-                <div class="grid grid-cols-7 gap-2">
-                    @for($i = 0; $i < $startDayOfWeek; $i++)
-                        <div class="h-24 bg-slate-50 rounded-xl border border-dashed border-slate-200"></div>
-                    @endfor
-
-                    @for($day = 1; $day <= $daysInMonth; $day++)
-                        @php
-                            $currentTimestamp = mktime(0, 0, 0, $month, $day, $year);
-                            $dayShort = date('D', $currentTimestamp);
-                            $shiftCol = $dayMap[$dayShort];
-                            $shiftVal = $wRoster ? $wRoster->$shiftCol : 'No Roster';
-                            $isToday = ($day == date('j') && $month == date('n') && $year == date('Y'));
-                            $isPast = ($currentTimestamp < strtotime('today'));
-                        @endphp
-                        <div class="h-28 p-2.5 rounded-xl border flex flex-col justify-between transition hover:scale-[1.02] {{ shiftColorClass($shiftVal) }} {{ $isToday ? 'ring-4 ring-blue-600 shadow-lg' : '' }} {{ $isPast ? 'opacity-75' : '' }}">
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm font-black {{ $isToday ? 'bg-blue-600 text-white px-2 py-0.5 rounded-full' : '' }}">
-                                    {{ $day }} {{ date('M', $currentTimestamp) }}
-                                </span>
-                                <span class="text-[10px] font-bold uppercase opacity-75">{{ $dayShort }}</span>
-                            </div>
-                            <div class="text-xs font-extrabold leading-tight my-auto">
-                                {{ $shiftVal }}
-                            </div>
-                            <div class="text-[10px] font-semibold flex justify-between items-center opacity-80">
-                                <span>8 Hrs</span>
-                                @if($isToday)
-                                    <span class="font-black text-blue-800 uppercase">● Today</span>
-                                @elseif($isPast)
-                                    <span>Passed</span>
-                                @else
-                                    <span>Upcoming</span>
-                                @endif
-                            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                @for($day = 1; $day <= $daysInMonth; $day++)
+                    @php
+                        $dateStr = sprintf('%04d-%02d-%02d', $year, $month, $day);
+                        $duty = $monthlyDuties->get($dateStr);
+                        $isToday = ($dateStr === date('Y-m-d'));
+                    @endphp
+                    <div class="min-h-[5.8rem] p-2 rounded-lg border flex flex-col justify-between {{ calColor($duty) }} {{ $isToday ? 'ring-2 ring-[#065f46]' : '' }}">
+                        <div class="flex justify-between items-center text-xs font-bold">
+                            <span class="{{ $isToday ? 'bg-[#065f46] text-white px-1.5 py-0.5 rounded' : '' }}">{{ $day }} {{ date('M', strtotime($dateStr)) }}</span>
+                            <span class="text-[10px] opacity-70">{{ date('D', strtotime($dateStr)) }}</span>
                         </div>
-                    @endfor
-                </div>
+                        <div class="text-[11px] font-bold leading-tight my-1">
+                            {{ $duty ? $duty->shift_name : '-' }}
+                            @if($duty && $duty->is_swapped) <span class="block text-[9px] text-purple-800">{{ $duty->swap_info }}</span> @endif
+                        </div>
+                        <div class="text-[9.5px] opacity-80 border-t pt-1 flex justify-between">
+                            <span>{{ $duty && $duty->in_time ? $duty->in_time : '--' }}-{{ $duty && $duty->out_time ? $duty->out_time : '--' }}</span>
+                            @if($duty && $duty->attendance_status === 'Late') <span class="font-bold text-amber-700">LATE</span> @endif
+                        </div>
+                    </div>
+                @endfor
             </div>
-        </main>
-    </div>
+        </div>
+    </main>
 </body>
 </html>

@@ -6,18 +6,15 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable {
     use HasFactory, Notifiable;
-    protected $fillable = [
-        'name', 'email', 'password', 'whatsapp_number',
-        'is_password_changed', 'otp', 'otp_expires_at', 'role', 'doctor_id'
-    ];
+    protected $guarded = [];
     protected $hidden = ['password', 'remember_token'];
     protected function casts(): array {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'allowed_shifts' => 'array',
         ];
     }
-    public function doctor() {
-        return $this->belongsTo(Doctor::class, 'doctor_id');
-    }
+    public function weeklyRosters() { return $this->hasMany(WeeklyRoster::class); }
+    public function dailyRosters() { return $this->hasMany(DailyRoster::class); }
 }
