@@ -1,6 +1,7 @@
 @php
     $handoverNotes = $handoverNotes ?? collect();
     $todayTeamRosters = $todayTeamRosters ?? collect();
+    $attendanceRate = $kpi['regular_days'] > 0 ? round(($kpi['present_days'] / $kpi['regular_days']) * 100) : 0;
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -20,9 +21,8 @@
     @include('partials.nav')
 
     <main class="max-w-7xl mx-auto w-full px-4 py-6 space-y-6 flex-1">
-        <!-- System Notifications -->
         @if(session('success'))
-            <div class="p-4 bg-emerald-50 border-l-4 border-[#065f46] text-emerald-950 font-semibold rounded-xl shadow-sm text-xs flex items-center justify-between">
+            <div class="p-4 bg-emerald-50 border-l-4 border-[#065f46] text-emerald-950 font-semibold rounded-2xl shadow-sm text-xs flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
                     <i class="fa-solid fa-circle-check text-[#065f46] text-base"></i>
                     <span>{{ session('success') }}</span>
@@ -31,13 +31,12 @@
             </div>
         @endif
         @if($errors->any())
-            <div class="p-4 bg-rose-50 border-l-4 border-rose-600 text-rose-950 font-semibold rounded-xl shadow-sm text-xs flex items-center gap-2.5">
+            <div class="p-4 bg-rose-50 border-l-4 border-rose-600 text-rose-950 font-semibold rounded-2xl shadow-sm text-xs flex items-center gap-2.5">
                 <i class="fa-solid fa-triangle-exclamation text-rose-600 text-base"></i>
                 <span>{{ $errors->first() }}</span>
             </div>
         @endif
 
-        <!-- Action Alerts for Swaps & Admin Approvals -->
         @if($pendingSwapsCount > 0)
             <div class="p-4 bg-purple-50 border border-purple-300 text-purple-950 rounded-2xl flex flex-wrap justify-between items-center gap-3 shadow-sm">
                 <div class="text-xs font-bold flex items-center gap-2.5">
@@ -57,13 +56,13 @@
                     <span>In-Charge Approval Needed: <strong>{{ $adminPendingSwaps }} Shift Swap(s)</strong> and <strong>{{ $adminPendingUpdates }} Time Correction(s)</strong> are pending.</span>
                 </div>
                 <a href="{{ route('admin.panel') }}" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-extrabold shadow-sm transition">
-                    Open Admin Queue &rarr;
+                    Open Admin Command Center &rarr;
                 </a>
             </div>
         @endif
 
         <!-- Top Executive Profile & Filter Bar -->
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
+        <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
             <div class="flex items-center gap-3.5">
                 <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-[#065f46] to-[#042f23] text-white flex items-center justify-center font-extrabold text-lg shadow-md">
                     {{ substr($activeUser->name, 0, 1) }}
@@ -113,7 +112,7 @@
                 <a href="{{ route('report.print', ['user_id' => $activeUser->id, 'month' => $month, 'year' => $year]) }}" class="bg-[#065f46] hover:bg-[#053b2c] text-white px-3.5 py-2 rounded-xl font-bold shadow-sm transition flex items-center gap-1.5">
                     <i class="fa-solid fa-print"></i> <span>A4 Sheet</span>
                 </a>
-                <a href="{{ route('report.csv', ['user_id' => $activeUser->id, 'month' => $month, 'year' => $year]) }}" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl font-bold shadow-sm transition flex items-center gap-1" title="Download Excel/CSV">
+                <a href="{{ route('report.csv', ['user_id' => $activeUser->id, 'month' => $month, 'year' => $year]) }}" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl font-bold shadow-sm transition flex items-center gap-1">
                     <i class="fa-solid fa-file-csv"></i> <span class="hidden sm:inline">CSV</span>
                 </a>
             </form>
@@ -131,13 +130,15 @@
                 </div>
             </div>
 
-            <div class="bg-white p-4 rounded-2xl border border-emerald-200 shadow-sm flex items-center justify-between">
-                <div>
-                    <span class="text-[11px] font-bold text-emerald-700 uppercase block">Present Logged</span>
-                    <span class="text-2xl font-extrabold text-emerald-800 mt-0.5 block">{{ $kpi['present_days'] }} <small class="text-[11px] font-normal text-slate-500">days</small></span>
-                </div>
-                <div class="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm">
-                    <i class="fa-solid fa-user-check"></i>
+            <div class="bg-white p-4 rounded-2xl border border-emerald-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] font-bold text-emerald-700 uppercase block">Present Logged</span>
+                        <span class="text-2xl font-extrabold text-emerald-800 mt-0.5 block">{{ $kpi['present_days'] }} <small class="text-[11px] font-normal text-slate-500">({{ $attendanceRate }}%)</small></span>
+                    </div>
+                    <div class="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-user-check"></i>
+                    </div>
                 </div>
             </div>
 
@@ -184,7 +185,7 @@
 
         <!-- Today's Live Time-Clock & Overtime Console -->
         @if($todayDuty && ($activeUser->id === Auth::id() || Auth::user()->role === 'admin'))
-        <div class="bg-gradient-to-r from-[#053b2c] to-[#065f46] text-white p-5 rounded-2xl shadow-md border border-emerald-600 flex flex-wrap justify-between items-center gap-4">
+        <div class="bg-gradient-to-r from-[#053b2c] to-[#065f46] text-white p-5 rounded-3xl shadow-md border border-emerald-600 flex flex-wrap justify-between items-center gap-4">
             <div class="flex items-center gap-3.5">
                 <div class="h-12 w-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl text-emerald-300">
                     <i class="fa-solid fa-fingerprint"></i>
@@ -207,7 +208,6 @@
                         <i class="fa-solid fa-mug-hot mr-1"></i> Today is Scheduled Weekly Off Day
                     </span>
                 @else
-                    <!-- In-Time Punch -->
                     @if(!$todayDuty->in_locked)
                     <form action="{{ route('attendance.punch', $todayDuty->id) }}" method="POST" class="flex items-center gap-1.5 bg-white/10 p-1.5 rounded-xl border border-white/20" onsubmit="return confirm('Confirm Save In-Time? Once saved, it will lock immediately.');">
                         @csrf
@@ -224,7 +224,6 @@
                     </div>
                     @endif
 
-                    <!-- Out-Time Punch -->
                     @if(!$todayDuty->out_locked)
                     <form action="{{ route('attendance.punch', $todayDuty->id) }}" method="POST" class="flex items-center gap-1.5 bg-white/10 p-1.5 rounded-xl border border-white/20" onsubmit="return confirm('Confirm Save Out-Time? Once saved, it will lock immediately.');">
                         @csrf
@@ -249,7 +248,7 @@
         </div>
         @endif
 
-        <!-- 4-Day Live Duty Snapshot Cards (2 Days Ago, Yesterday, Today, Tomorrow) -->
+        <!-- 4-Day Live Duty Snapshot Cards -->
         <div>
             <div class="flex items-center justify-between mb-2.5">
                 <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
@@ -329,7 +328,7 @@
             </div>
         </div>
 
-        <!-- Monthly Interactive Color-Coded Calendar -->
+        <!-- Monthly Interactive Color-Coded Calendar with Shift Filter Pills -->
         @php
             $firstDay = mktime(0, 0, 0, $month, 1, $year);
             $daysInMonth = date('t', $firstDay);
@@ -346,28 +345,39 @@
                 if (str_contains(strtolower($duty->shift_name), 'night')) return 'bg-indigo-50/90 text-indigo-950 border-indigo-300';
                 return 'bg-teal-50 text-teal-950 border-teal-300';
             }
+
+            function getDutyCategory($duty) {
+                if (!$duty) return 'none';
+                if ($duty->is_swapped) return 'swapped';
+                if ($duty->is_off_day || str_contains(strtolower($duty->shift_name), 'off')) return 'off';
+                if (str_contains(strtolower($duty->shift_name), 'morning')) return 'morning';
+                if (str_contains(strtolower($duty->shift_name), 'evening')) return 'evening';
+                if (str_contains(strtolower($duty->shift_name), 'night')) return 'night';
+                return 'general';
+            }
         @endphp
 
-        <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-slate-200">
             <div class="flex flex-wrap justify-between items-center gap-4 mb-5 border-b border-slate-100 pb-4">
                 <div>
                     <h3 class="text-base md:text-lg font-extrabold text-slate-900 flex items-center gap-2">
                         <i class="fa-regular fa-calendar-days text-[#065f46]"></i>
                         {{ $monthTitle }} &mdash; Interactive Duty Roster Calendar ({{ $activeUser->name }})
                     </h3>
-                    <p class="text-xs text-slate-500">Visual monthly overview of shifts, weekly off days, mutual swaps, overtime, and attendance status.</p>
+                    <p class="text-xs text-slate-500">Click any shift badge on the right to highlight specific shifts on the calendar.</p>
                 </div>
 
+                <!-- Interactive Filter Pills -->
                 <div class="flex flex-wrap gap-1.5 text-[11px] font-bold">
-                    <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-300">Morning</span>
-                    <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-300">Evening</span>
-                    <span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-300">Night</span>
-                    <span class="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-900 border border-purple-300">Swapped</span>
-                    <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-900 border border-rose-200">Off Day</span>
+                    <button type="button" onclick="filterCalendarCells('all')" class="px-2.5 py-1 rounded-lg bg-slate-800 text-white">All Days</button>
+                    <button type="button" onclick="filterCalendarCells('morning')" class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100">Morning</button>
+                    <button type="button" onclick="filterCalendarCells('evening')" class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100">Evening</button>
+                    <button type="button" onclick="filterCalendarCells('night')" class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-300 hover:bg-indigo-100">Night</button>
+                    <button type="button" onclick="filterCalendarCells('swapped')" class="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-900 border border-purple-300 hover:bg-purple-100">Swapped</button>
+                    <button type="button" onclick="filterCalendarCells('off')" class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-900 border border-rose-200 hover:bg-rose-100">Off Day</button>
                 </div>
             </div>
 
-            <!-- Weekday Headers (Desktop) -->
             <div class="hidden md:grid grid-cols-7 gap-2.5 text-center font-extrabold text-xs uppercase text-slate-600 mb-2.5">
                 <div class="bg-slate-100 py-2 rounded-xl">Sunday</div>
                 <div class="bg-slate-100 py-2 rounded-xl">Monday</div>
@@ -378,7 +388,6 @@
                 <div class="bg-slate-100 py-2 rounded-xl">Saturday</div>
             </div>
 
-            <!-- Calendar Days Grid -->
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2.5">
                 @for($i = 0; $i < $startDayOfWeek; $i++)
                     <div class="hidden md:block min-h-[7rem] bg-slate-50/40 rounded-xl border border-dashed border-slate-200"></div>
@@ -390,8 +399,9 @@
                         $duty = $monthlyDuties->get($dateStr);
                         $isToday = ($dateStr === date('Y-m-d'));
                         $dayShort = date('D', strtotime($dateStr));
+                        $cat = getDutyCategory($duty);
                     @endphp
-                    <div class="min-h-[7rem] p-2.5 rounded-xl border flex flex-col justify-between transition hover:shadow-md {{ getDutyCellTheme($duty) }} {{ $isToday ? 'ring-2 ring-[#065f46] shadow-md' : '' }}">
+                    <div class="cal-day-cell min-h-[7rem] p-2.5 rounded-xl border flex flex-col justify-between transition hover:shadow-md {{ getDutyCellTheme($duty) }} {{ $isToday ? 'ring-2 ring-[#065f46] shadow-md' : '' }}" data-cat="{{ $cat }}">
                         <div class="flex justify-between items-center">
                             <span class="text-xs font-extrabold {{ $isToday ? 'bg-[#065f46] text-white px-2 py-0.5 rounded-md' : '' }}">
                                 {{ $day }} {{ date('M', strtotime($dateStr)) }}
@@ -432,8 +442,7 @@
 
         <!-- Bottom Operational Hub: Today's Live Team Coverage & Shift Handover Logbook -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <!-- Left: Who's On Duty Today Across Team -->
-            <div class="lg:col-span-5 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+            <div class="lg:col-span-5 bg-white p-5 rounded-3xl shadow-sm border border-slate-200 flex flex-col">
                 <div class="border-b border-slate-100 pb-3 mb-3 flex justify-between items-center">
                     <div>
                         <h3 class="text-sm font-extrabold text-slate-900 flex items-center gap-2">
@@ -474,8 +483,7 @@
                 </div>
             </div>
 
-            <!-- Right: Shift Handover Notes & Front Desk Logbook -->
-            <div class="lg:col-span-7 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+            <div class="lg:col-span-7 bg-white p-5 rounded-3xl shadow-sm border border-slate-200 flex flex-col">
                 <div class="border-b border-slate-100 pb-3 mb-3 flex justify-between items-center">
                     <div>
                         <h3 class="text-sm font-extrabold text-slate-900 flex items-center gap-2">
@@ -486,20 +494,18 @@
                     </div>
                 </div>
 
-                <!-- Post New Handover Note Form -->
-                <form action="{{ route('handover.store') }}" method="POST" class="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-4 flex flex-wrap sm:flex-nowrap items-center gap-2 text-xs">
+                <form action="{{ route('handover.store') }}" method="POST" class="bg-slate-50 p-3 rounded-2xl border border-slate-200 mb-4 flex flex-wrap sm:flex-nowrap items-center gap-2 text-xs">
                     @csrf
-                    <select name="priority" class="border border-slate-300 p-2 rounded-lg font-bold bg-white">
+                    <select name="priority" class="border border-slate-300 p-2 rounded-xl font-bold bg-white">
                         <option value="normal">Normal Note</option>
                         <option value="urgent">Urgent Alert</option>
                     </select>
-                    <input type="text" name="message" placeholder="Write handover note for incoming shift (e.g. Pending corporate billing / VIP appointment)..." class="flex-1 border border-slate-300 p-2 rounded-lg bg-white w-full" required>
-                    <button type="submit" class="bg-[#065f46] hover:bg-[#053b2c] text-white font-bold px-4 py-2 rounded-lg shrink-0 shadow-sm">
+                    <input type="text" name="message" placeholder="Write handover note for incoming shift (e.g. Pending corporate billing / VIP appointment)..." class="flex-1 border border-slate-300 p-2 rounded-xl bg-white w-full" required>
+                    <button type="submit" class="bg-[#065f46] hover:bg-[#053b2c] text-white font-bold px-4 py-2 rounded-xl shrink-0 shadow-sm">
                         Post Note
                     </button>
                 </form>
 
-                <!-- Handover Notes Feed -->
                 <div class="space-y-2 max-h-60 overflow-y-auto flex-1 pr-1">
                     @forelse($handoverNotes as $note)
                     <div class="p-3 rounded-xl border {{ $note->is_resolved ? 'bg-slate-50 border-slate-200 opacity-60' : ($note->priority === 'urgent' ? 'bg-rose-50/60 border-rose-200' : 'bg-amber-50/40 border-amber-200') }} flex justify-between items-start gap-3 text-xs">
@@ -525,12 +531,26 @@
                     </div>
                     @empty
                     <div class="text-xs text-slate-400 text-center py-6">
-                        No shift handover notes posted yet. Use the box above to leave a note for your colleagues.
+                        No shift handover notes posted yet.
                     </div>
                     @endforelse
                 </div>
             </div>
         </div>
     </main>
+
+    <script>
+        function filterCalendarCells(cat) {
+            document.querySelectorAll('.cal-day-cell').forEach(function(cell) {
+                if (cat === 'all' || cell.getAttribute('data-cat') === cat) {
+                    cell.style.opacity = '1';
+                    cell.style.transform = 'scale(1)';
+                } else {
+                    cell.style.opacity = '0.25';
+                    cell.style.transform = 'scale(0.97)';
+                }
+            });
+        }
+    </script>
 </body>
 </html>

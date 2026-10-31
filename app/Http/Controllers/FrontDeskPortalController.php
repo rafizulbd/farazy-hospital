@@ -480,7 +480,30 @@ class FrontDeskPortalController extends Controller
         $pendingUpdates = DailyRoster::with('user')->where('update_status', 'pending')->orderBy('duty_date', 'desc')->get();
         $logs = ActivityLog::latest()->limit(120)->get();
 
-        return view('admin.panel', compact('setting', 'users', 'shifts', 'pendingSwaps', 'pendingUpdates', 'logs'));
+        // Read-Only Analytics for Charts (Target Month)
+        $monthRosters = DailyRoster::whereYear('duty_date', $setting->target_year)
+            ->whereMonth('duty_date', $setting->target_month)
+            ->get();
+
+        $chartStats = [
+            'present' => $monthRosters->where('attendance_status', 'Present')->count(),
+            'late'    => $monthRosters->where('attendance_status', 'Late')->count(),
+            'absent'  => $monthRosters->where('attendance_status', 'Absent')->count(),
+            'off'     => $monthRosters->where('is_off_day', true)->count(),
+            'pending' => $monthRosters->where('attendance_status', 'Pending')->where('is_off_day', false)->count(),
+            'morning' => $monthRosters->filter(fn($r) => str_contains(strtolower($r->shift_name), 'morning'))->count(),
+            'evening' => $monthRosters->filter(fn($r) => str_contains(strtolower($r->shift_name), 'evening'))->count(),
+            'night'   => $monthRosters->filter(fn($r) => str_contains(strtolower($r->shift_name), 'night'))->count(),
+            'general' => $monthRosters->filter(fn($r) => !str_contains(strtolower($r->shift_name), 'morning') && !str_contains(strtolower($r->shift_name), 'evening') && !str_contains(strtolower($r->shift_name), 'night') && !$r->is_off_day)->count(),
+            'ot_hrs'  => $monthRosters->where('has_overtime', true)->sum('overtime_hours'),
+        ];
+
+        $draftSubmittedCount = WeeklyRoster::where('month', $setting->target_month)
+            ->where('year', $setting->target_year)
+            ->where('is_submitted', true)
+            ->count();
+
+        return view('admin.panel', compact('setting', 'users', 'shifts', 'pendingSwaps', 'pendingUpdates', 'logs', 'chartStats', 'draftSubmittedCount'));
     }
 
     public function updateSystemSettings(Request $request) {
@@ -578,7 +601,7 @@ class FrontDeskPortalController extends Controller
         $u->designation = $request->designation ?: $u->designation;
         $u->department = $request->department ?: $u->department;
         $u->role = $request->role ?: $u->role;
-        $u->is_active = $request->has('is_active') ? (bool)$request->is_active : $u->is_active;
+        $u->is_active = $request->has('is_active') ? (bool)$request->is_active : false;
         if ($request->has('allowed_shifts')) {
             $u->allowed_shifts = $request->allowed_shifts;
         }
