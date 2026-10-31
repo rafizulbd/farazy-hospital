@@ -8,9 +8,11 @@ use App\Models\WeeklyRoster;
 use App\Models\DailyRoster;
 use App\Models\ShiftSwap;
 use App\Models\ActivityLog;
+use App\Models\HandoverNote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class FrontDeskPortalController extends Controller
@@ -72,8 +74,38 @@ class FrontDeskPortalController extends Controller
         $pendingSwapsCount = ShiftSwap::where('target_user_id', $user->id)->where('status', 'pending_colleague')->count();
         $adminPendingSwaps = ShiftSwap::where('status', 'colleague_accepted')->count();
         $adminPendingUpdates = DailyRoster::where('update_status', 'pending')->count();
+        $handoverNotes = Schema::hasTable('handover_notes') ? HandoverNote::with('user')->latest()->limit(12)->get() : collect();
+        $todayTeamRosters = DailyRoster::with('user')->where('duty_date', Carbon::today()->toDateString())->get();
 
-        return view('dashboard', compact('setting', 'user', 'team', 'activeUser', 'month', 'year', 'twoDaysAgoDuty', 'yesterdayDuty', 'todayDuty', 'tomorrowDuty', 'monthlyDuties', 'kpi', 'shifts', 'pendingSwapsCount', 'adminPendingSwaps', 'adminPendingUpdates'));
+        return view('dashboard', compact(
+            'setting', 'user', 'team', 'activeUser', 'month', 'year',
+            'twoDaysAgoDuty', 'yesterdayDuty', 'todayDuty', 'tomorrowDuty',
+            'monthlyDuties', 'kpi', 'shifts', 'pendingSwapsCount',
+            'adminPendingSwaps', 'adminPendingUpdates', 'handoverNotes', 'todayTeamRosters'
+        ));
+    }
+
+    public function storeHandoverNote(Request $request) {
+        $request->validate(['message' => 'required|string|max:500']);
+        if (Schema::hasTable('handover_notes')) {
+            HandoverNote::create([
+                'user_id' => Auth::id(),
+                'shift_name' => $request->shift_name ?: 'Front Desk Shift',
+                'priority' => $request->priority ?: 'normal',
+                'message' => $request->message,
+                'is_resolved' => false,
+            ]);
+            ActivityLog::record('HANDOVER_NOTE', Auth::user()->name . ' posted a shift handover note.');
+        }
+        return back()->with('success', 'Shift Handover Note posted to team board!');
+    }
+
+    public function resolveHandoverNote($id) {
+        if (Schema::hasTable('handover_notes')) {
+            $note = HandoverNote::findOrFail($id);
+            $note->update(['is_resolved' => !$note->is_resolved]);
+        }
+        return back()->with('success', 'Handover note status updated.');
     }
 
     private function ensureMonthlyDaysExist($user, $month, $year) {
@@ -91,7 +123,7 @@ class FrontDeskPortalController extends Controller
             $dateObj = Carbon::create($year, $month, $d);
             $shiftName = $weekly->{$dayColMap[$dateObj->format('D')]};
             $tpl = $shiftMap->get($shiftName);
-            $isOff = $tpl ? $tpl->is_off_day : str_contains(strtolower($shiftName), 'off');
+            $isOff = $tpl ? $tpl->is_off_day : str_contains(strtolower((string)$shiftName), 'off');
 
             DailyRoster::updateOrCreate(
                 ['user_id' => $user->id, 'duty_date' => $dateObj->toDateString()],
@@ -195,7 +227,7 @@ class FrontDeskPortalController extends Controller
             $setting->verified_by = $request->input('verified_by', Auth::user()->name);
         }
         $setting->save();
-        ActivityLog::record('ROSTER_MERGED', "Merged roster for {$month}/{$year}.");
+        ActivityLog::record('ROSTER_MERGED', "Merged roster for {$month}/{$year} & updated phase to {$setting->roster_phase}.");
         return back()->with('success', 'Monthly Roster Merged & Phase Updated!');
     }
 
@@ -214,6 +246,7 @@ class FrontDeskPortalController extends Controller
             'duty_date' => $request->duty_date, 'requester_shift' => $myDuty->shift_name,
             'target_shift' => $tarDuty->shift_name, 'reason' => $request->reason, 'status' => 'pending_colleague',
         ]);
+        ActivityLog::record('SWAP_REQUEST', "Requested shift swap on {$request->duty_date}.");
         return back()->with('success', 'Shift Swap request sent to colleague!');
     }
 
@@ -224,12 +257,11 @@ class FrontDeskPortalController extends Controller
 
         if ($swap->status === 'pending_colleague' && ($user->id == $swap->target_user_id || $user->role === 'admin')) {
             if ($action === 'colleague_accept') {
-                $swap->status = 'colleague_accepted';
-                $swap->save();
+                $swap->update(['status' => 'colleague_accepted']);
+                ActivityLog::record('SWAP_ACCEPTED', "Colleague accepted swap on {$swap->duty_date}. Waiting for Admin.");
                 return back()->with('success', 'Accepted! Waiting for Admin Approval.');
-            } else {
-                $swap->status = 'colleague_rejected';
-                $swap->save();
+            } elseif ($action === 'colleague_reject') {
+                $swap->update(['status' => 'colleague_rejected']);
                 return back()->with('success', 'Swap rejected.');
             }
         }
@@ -240,12 +272,13 @@ class FrontDeskPortalController extends Controller
                 $tarDuty = DailyRoster::where('user_id', $swap->target_user_id)->where('duty_date', $swap->duty_date)->first();
                 if ($reqDuty && $tarDuty) {
                     $tName = $reqDuty->shift_name; $tStart = $reqDuty->shift_start; $tEnd = $reqDuty->shift_end; $tOff = $reqDuty->is_off_day;
-                    $reqDuty->update(['shift_name' => $tarDuty->shift_name, 'shift_start' => $tarDuty->shift_start, 'shift_end' => $tarDuty->shift_end, 'is_off_day' => $tarDuty->is_off_day, 'is_swapped' => true, 'swap_info' => 'Swapped with ' . $swap->targetUser->name]);
-                    $tarDuty->update(['shift_name' => $tName, 'shift_start' => $tStart, 'shift_end' => $tEnd, 'is_off_day' => $tOff, 'is_swapped' => true, 'swap_info' => 'Swapped with ' . $swap->requester->name]);
+                    $reqDuty->update(['shift_name' => $tarDuty->shift_name, 'shift_start' => $tarDuty->shift_start, 'shift_end' => $tarDuty->shift_end, 'is_off_day' => $tarDuty->is_off_day, 'is_swapped' => true, 'swap_info' => 'Swapped with ' . ($swap->targetUser->name ?? 'Colleague')]);
+                    $tarDuty->update(['shift_name' => $tName, 'shift_start' => $tStart, 'shift_end' => $tEnd, 'is_off_day' => $tOff, 'is_swapped' => true, 'swap_info' => 'Swapped with ' . ($swap->requester->name ?? 'Colleague')]);
                 }
                 $swap->update(['status' => 'admin_approved']);
+                ActivityLog::record('SWAP_APPROVED', "Admin approved shift swap on {$swap->duty_date}.");
                 return back()->with('success', 'Admin approved! Main roster updated.');
-            } else {
+            } elseif ($action === 'admin_reject') {
                 $swap->update(['status' => 'admin_rejected']);
                 return back()->with('success', 'Swap rejected by Admin.');
             }
@@ -270,6 +303,7 @@ class FrontDeskPortalController extends Controller
             $duty->in_locked = true;
             $this->recalculateLateStatus($duty);
             $duty->save();
+            ActivityLog::record('PUNCH_IN', "{$duty->user->name} punched In ({$duty->in_time}) on {$duty->duty_date}.");
             return back()->with('success', "In-Time ({$duty->in_time}) saved & locked!");
         }
         if ($type === 'out_time') {
@@ -277,6 +311,7 @@ class FrontDeskPortalController extends Controller
             $duty->out_time = $request->out_time;
             $duty->out_locked = true;
             $duty->save();
+            ActivityLog::record('PUNCH_OUT', "{$duty->user->name} punched Out ({$duty->out_time}) on {$duty->duty_date}.");
             return back()->with('success', "Out-Time ({$duty->out_time}) saved & locked!");
         }
         if ($type === 'overtime') {
@@ -284,6 +319,7 @@ class FrontDeskPortalController extends Controller
             $duty->overtime_shift = $request->overtime_shift;
             $duty->overtime_hours = (float)$request->input('overtime_hours', 8);
             $duty->save();
+            ActivityLog::record('OVERTIME', "{$duty->user->name} logged overtime ({$duty->overtime_shift}) on {$duty->duty_date}.");
             return back()->with('success', 'Overtime shift saved!');
         }
         return back();
@@ -318,12 +354,13 @@ class FrontDeskPortalController extends Controller
             'req_reason' => $request->req_reason,
             'update_status' => 'pending',
         ]);
+        ActivityLog::record('TIME_UPDATE_REQ', Auth::user()->name . " requested time update for {$duty->duty_date}.");
         return back()->with('success', 'Update Request submitted for approval!');
     }
 
     public function adminApproveAttendance(Request $request, $id) {
         if (Auth::user()->role !== 'admin') abort(403);
-        $duty = DailyRoster::findOrFail($id);
+        $duty = DailyRoster::with('user')->findOrFail($id);
         $action = $request->input('action');
 
         if ($action === 'approve_request') {
@@ -337,6 +374,7 @@ class FrontDeskPortalController extends Controller
             $this->recalculateLateStatus($duty);
             $duty->update_status = 'approved';
             $duty->save();
+            ActivityLog::record('TIME_UPDATE_APPROVED', "Approved attendance correction for {$duty->user->name} on {$duty->duty_date}.");
             return back()->with('success', 'Attendance update approved!');
         }
 
@@ -360,6 +398,7 @@ class FrontDeskPortalController extends Controller
             }
             $duty->update_status = 'approved';
             $duty->save();
+            ActivityLog::record('ADMIN_OVERRIDE', "Overrode shift/attendance for {$duty->user->name} on {$duty->duty_date}.");
             return back()->with('success', 'Super Admin Override saved!');
         }
 
@@ -439,39 +478,82 @@ class FrontDeskPortalController extends Controller
         $shifts = ShiftTemplate::all();
         $pendingSwaps = ShiftSwap::with(['requester', 'targetUser'])->whereIn('status', ['colleague_accepted', 'pending_colleague'])->latest()->get();
         $pendingUpdates = DailyRoster::with('user')->where('update_status', 'pending')->orderBy('duty_date', 'desc')->get();
-        $logs = ActivityLog::latest()->limit(100)->get();
+        $logs = ActivityLog::latest()->limit(120)->get();
 
         return view('admin.panel', compact('setting', 'users', 'shifts', 'pendingSwaps', 'pendingUpdates', 'logs'));
     }
 
     public function updateSystemSettings(Request $request) {
         if (Auth::user()->role !== 'admin') abort(403);
-        $this->getSetting()->update([
-            'hospital_name' => $request->hospital_name,
-            'hospital_address' => $request->hospital_address,
-            'department_name' => $request->department_name,
-            'logo_url' => $request->logo_url,
-            'favicon_url' => $request->favicon_url,
-            'notice_text' => $request->notice_text,
-            'roster_phase' => $request->roster_phase,
-            'target_month' => (int)$request->target_month,
-            'target_year' => (int)$request->target_year,
-            'validity_text' => $request->validity_text,
-            'is_verified' => $request->has('is_verified'),
-            'verified_by' => $request->verified_by,
-            'unlock_past_attendance' => $request->has('unlock_past_attendance'),
-            'sig1_name' => $request->sig1_name, 'sig1_title' => $request->sig1_title,
-            'sig2_name' => $request->sig2_name, 'sig2_title' => $request->sig2_title,
-            'sig3_name' => $request->sig3_name, 'sig3_title' => $request->sig3_title,
-            'sig4_name' => $request->sig4_name, 'sig4_title' => $request->sig4_title,
+
+        $request->validate([
+            'hospital_name'   => 'required|string|max:255',
+            'department_name' => 'required|string|max:255',
+            'logo_file'       => 'nullable|file|mimes:png,jpg,jpeg,webp,svg|max:3072',
+            'favicon_file'    => 'nullable|file|mimes:ico,png,jpg,webp,svg|max:1024',
         ]);
-        return back()->with('success', 'Central configuration updated successfully!');
+
+        $setting = $this->getSetting();
+        $uploadDir = public_path('uploads/branding');
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+        $logoUrl = $request->input('logo_url', $setting->logo_url);
+        if ($request->hasFile('logo_file')) {
+            $file = $request->file('logo_file');
+            $filename = 'logo_' . time() . '.' . $file->getClientOriginalExtension();
+            $file->move($uploadDir, $filename);
+            @copy($uploadDir . '/' . $filename, storage_path('app/public/branding/' . $filename));
+            $logoUrl = asset('uploads/branding/' . $filename);
+        } elseif ($request->boolean('remove_logo')) {
+            $logoUrl = null;
+        }
+
+        $faviconUrl = $request->input('favicon_url', $setting->favicon_url);
+        if ($request->hasFile('favicon_file')) {
+            $fav = $request->file('favicon_file');
+            $favName = 'favicon_' . time() . '.' . $fav->getClientOriginalExtension();
+            $fav->move($uploadDir, $favName);
+            @copy($uploadDir . '/' . $favName, storage_path('app/public/branding/' . $favName));
+            $faviconUrl = asset('uploads/branding/' . $favName);
+        } elseif ($request->boolean('remove_favicon')) {
+            $faviconUrl = null;
+        }
+
+        $data = [
+            'hospital_name'          => $request->hospital_name,
+            'hospital_address'       => $request->hospital_address,
+            'department_name'        => $request->department_name,
+            'logo_url'               => $logoUrl,
+            'favicon_url'            => $faviconUrl,
+            'notice_text'            => $request->notice_text,
+            'roster_phase'           => $request->roster_phase,
+            'target_month'           => (int)$request->target_month,
+            'target_year'            => (int)$request->target_year,
+            'validity_text'          => $request->validity_text,
+            'is_verified'            => $request->has('is_verified'),
+            'verified_by'            => $request->verified_by,
+            'unlock_past_attendance' => $request->has('unlock_past_attendance'),
+            'sig1_name'              => $request->sig1_name, 'sig1_title' => $request->sig1_title,
+            'sig2_name'              => $request->sig2_name, 'sig2_title' => $request->sig2_title,
+            'sig3_name'              => $request->sig3_name, 'sig3_title' => $request->sig3_title,
+            'sig4_name'              => $request->sig4_name, 'sig4_title' => $request->sig4_title,
+        ];
+
+        if (Schema::hasColumn('system_settings', 'hospital_tagline')) $data['hospital_tagline'] = $request->hospital_tagline;
+        if (Schema::hasColumn('system_settings', 'hospital_phone')) $data['hospital_phone'] = $request->hospital_phone;
+        if (Schema::hasColumn('system_settings', 'hospital_email')) $data['hospital_email'] = $request->hospital_email;
+        if (Schema::hasColumn('system_settings', 'emergency_alert')) $data['emergency_alert'] = $request->emergency_alert;
+
+        $setting->update($data);
+
+        ActivityLog::record('CENTRAL_SETTINGS_UPDATED', "Updated central hospital branding, logo/favicon & signatures.");
+        return back()->with('success', 'Central Hospital Info, Logo, Favicon & Signatures updated successfully!');
     }
 
     public function storeUser(Request $request) {
         if (Auth::user()->role !== 'admin') abort(403);
         $request->validate(['name' => 'required', 'email' => 'required|email|unique:users,email']);
-        User::create([
+        $u = User::create([
             'name' => $request->name, 'email' => $request->email,
             'password' => Hash::make($request->password ?: 'password123'),
             'whatsapp_number' => $request->whatsapp_number,
@@ -482,7 +564,8 @@ class FrontDeskPortalController extends Controller
             'allowed_shifts' => $request->allowed_shifts ?? [],
             'is_password_changed' => false, 'is_active' => true,
         ]);
-        return back()->with('success', 'User created successfully!');
+        ActivityLog::record('USER_CREATED', "Created account for {$u->name} ({$u->employee_id}).");
+        return back()->with('success', "User {$u->name} created successfully!");
     }
 
     public function updateUser(Request $request, $id) {
@@ -493,21 +576,28 @@ class FrontDeskPortalController extends Controller
         $u->whatsapp_number = $request->whatsapp_number;
         $u->employee_id = $request->employee_id ?: $u->employee_id;
         $u->designation = $request->designation ?: $u->designation;
+        $u->department = $request->department ?: $u->department;
         $u->role = $request->role ?: $u->role;
-        if ($request->has('allowed_shifts')) $u->allowed_shifts = $request->allowed_shifts;
+        $u->is_active = $request->has('is_active') ? (bool)$request->is_active : $u->is_active;
+        if ($request->has('allowed_shifts')) {
+            $u->allowed_shifts = $request->allowed_shifts;
+        }
         if ($request->filled('new_password')) {
             $u->password = Hash::make($request->new_password);
             $u->is_password_changed = false;
         }
         $u->save();
-        return back()->with('success', 'User profile updated!');
+        ActivityLog::record('USER_UPDATED', "Updated profile/permissions for {$u->name}.");
+        return back()->with('success', "Profile updated for {$u->name}!");
     }
 
     public function deleteUser($id) {
         if (Auth::user()->role !== 'admin') abort(403);
         $u = User::findOrFail($id);
         if ($u->id === Auth::id()) return back()->withErrors(['msg' => 'Cannot delete your own admin account!']);
+        $name = $u->name;
         $u->delete();
+        ActivityLog::record('USER_DELETED', "Deleted user {$name}.");
         return back()->with('success', 'User deleted.');
     }
 
@@ -515,11 +605,13 @@ class FrontDeskPortalController extends Controller
         if (Auth::user()->role !== 'admin') abort(403);
         $request->validate(['name' => 'required']);
         ShiftTemplate::create([
-            'name' => $request->name, 'short_code' => substr($request->name, 0, 3),
+            'name' => $request->name, 'short_code' => $request->short_code ?: substr($request->name, 0, 3),
             'start_time' => $request->start_time, 'end_time' => $request->end_time,
             'grace_minutes' => (int)$request->input('grace_minutes', 5),
-            'is_off_day' => $request->has('is_off_day'), 'color_theme' => 'emerald',
+            'is_off_day' => $request->has('is_off_day'),
+            'color_theme' => $request->color_theme ?: 'emerald',
         ]);
+        ActivityLog::record('SHIFT_CREATED', "Created shift template: {$request->name}.");
         return back()->with('success', 'Custom Shift Template added!');
     }
 

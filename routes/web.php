@@ -25,6 +25,9 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth', 'force_password'])->group(function () {
     Route::get('/dashboard', [FD::class, 'dashboard'])->name('dashboard');
+    Route::post('/handover-notes', [FD::class, 'storeHandoverNote'])->name('handover.store');
+    Route::post('/handover-notes/{id}/resolve', [FD::class, 'resolveHandoverNote'])->name('handover.resolve');
+
     Route::get('/rosters', [FD::class, 'rosterPortal'])->name('rosters.index');
     Route::get('/rosters/create', [FD::class, 'rosterPortal'])->name('rosters.create');
     Route::post('/rosters/draft', [FD::class, 'saveDraft'])->name('rosters.draft.save');
@@ -32,11 +35,14 @@ Route::middleware(['auth', 'force_password'])->group(function () {
     Route::post('/rosters/unlock/{userId}', [FD::class, 'unlockOrDeleteDraft'])->name('rosters.draft.unlock');
     Route::post('/rosters/swap-request', [FD::class, 'requestSwap'])->name('rosters.swap.request');
     Route::post('/rosters/swap-respond/{id}', [FD::class, 'respondSwap'])->name('rosters.swap.respond');
+
     Route::post('/attendance/punch/{id}', [FD::class, 'punchAttendance'])->name('attendance.punch');
     Route::post('/attendance/request-update/{id}', [FD::class, 'requestAttendanceUpdate'])->name('attendance.request.update');
     Route::post('/attendance/admin-action/{id}', [FD::class, 'adminApproveAttendance'])->name('attendance.admin.action');
+
     Route::get('/report/print', [FD::class, 'printReport'])->name('report.print');
     Route::get('/report/export-csv', [FD::class, 'exportCsv'])->name('report.csv');
+
     Route::get('/admin-panel', [FD::class, 'adminPanel'])->name('admin.panel');
     Route::get('/doctors', [FD::class, 'adminPanel'])->name('doctors.index');
     Route::post('/admin/settings', [FD::class, 'updateSystemSettings'])->name('admin.settings.update');
